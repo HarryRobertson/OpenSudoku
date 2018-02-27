@@ -32,6 +32,19 @@ namespace OpenSudoku
         //   9  ||   | 5 | 3 ||   |   | 2 ||   | 4 | 6 ||
         //      =========================================
 
+        private char[][] _values =
+        {
+            new[] {'5','8',' ','1',' ',' ','3','2',' '},
+            new[] {'3',' ',' ','2','5',' ',' ',' ',' '},
+            new[] {'4','2','9',' ',' ',' ',' ',' ',' '},
+            new[] {' ','1','6','3',' ','8','4',' ',' '},
+            new[] {'8',' ',' ',' ',' ',' ',' ',' ','3'},
+            new[] {' ',' ','4','6',' ','5','1','9',' '},
+            new[] {' ',' ',' ',' ',' ',' ','5','7','2'},
+            new[] {' ',' ',' ',' ','6','9',' ',' ','1'},
+            new[] {' ','5','3',' ',' ','2',' ','4','6'}
+        };
+
         private static ICell BuildMockCell(char[] vals)
         {
             Mock<ICell> mock = new Mock<ICell>();
@@ -139,16 +152,18 @@ namespace OpenSudoku
             const int br = 3;
             const int bc = 3;
 
-            Func<ICell> fullCell = () => BuildMockCell(new[] { '1', '2', '3', '4', '5', '6', '7', '8', '9' });
+            ICell FullCell() => BuildMockCell(new[] {'1', '2', '3', '4', '5', '6', '7', '8', '9'});
+
             ICell[][] cells = new ICell[r][];
             for (int i = 0; i < cells.Length; i++)
             {
                 ICell[] row = cells[i] = new ICell[c];
                 for (int j = 0; j < row.Length; j++)
                 {
-                    row[j] = fullCell();
+                    row[j] = FullCell();
                 }
             }
+
             IGroup[] rows = new IGroup[r];
             for (int i = 0; i < rows.Length; i++)
             {
@@ -193,14 +208,20 @@ namespace OpenSudoku
             IGrid grid = BuildMockGrid(cells, groups);
 
             Controller test = new Controller(grid);
-            test.Initialise();
+            test.Initialise(_values);
 
-            //GetCoordinate(This).X;
+            var coordinates = GetCoordinates(This);
+            ICell cell = cells[coordinates.Y][coordinates.X];
+
+            Assert.AreEqual(1, cell.Values.Count);
+            Assert.AreEqual(That, cell.Values.Single());
         }
 
-        private static (int X, int Y) GetCoordinate(string s)
+        private static (int X, int Y) GetCoordinates(string s)
         {
             if (s.Length != 2) throw new ArgumentException($"s.Length was {s.Length}, must be 2.");
+
+            s = s.ToUpper();
 
             char i = s[0];
             char j = s[1];
