@@ -69,7 +69,7 @@ namespace OpenSudoku
 
         public static IGrid BuildMockGrid(int rowCount, int colCount, int boxRowCount, int boxColCount)
         {
-            char[] cellValues = Enumerable.Range(1, 9).Select(Convert.ToChar).ToArray();
+            char[] cellValues = Enumerable.Range(1, 9).Select(i => Convert.ToChar(i.ToString())).ToArray();
             ICell[][] cells = Enumerable.Range(0, rowCount)
                 .Select(row => Enumerable.Range(0, colCount).Select(col => BuildMockCell(cellValues, row, col)).ToArray())
                 .ToArray();

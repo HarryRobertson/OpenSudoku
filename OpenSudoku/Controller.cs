@@ -5,12 +5,44 @@ namespace OpenSudoku
 {
     internal static class Extensions
     {
-        public static void RemoveExcept(this ICollection<char> list, char value)
+        public static void RemoveExcept<T>(this ICollection<T> list, T toRemove)
         {
-            List<char> remove = list.Where(v => v != value).ToList();
-            foreach (char c in remove)
+            IEnumerable<T> itemsToRemove = list.Where(v => !v.Equals(toRemove));
+            foreach (T item in itemsToRemove.ToArray()) // ToArray() to force enumeration before the loop
             {
-                list.Remove(c);
+                list.Remove(item);
+            }
+        }
+
+        public static void UpdateCell(this IGrid grid, ICell cell, char value)
+        {
+            cell.Values.RemoveExcept(value);
+            IReadOnlyCollection<IGroup> groups = grid.Index[cell];
+
+            // update grouped cells...
+            ICell[] others = groups
+                .Aggregate((IEnumerable<ICell>)new List<ICell>(), (acc, group) => acc.Concat(group.Cells))
+                .Distinct()
+                .Where(c => c != cell)
+                .ToArray();
+            foreach (ICell other in others)
+            {
+                other.Values.Remove(value);
+                foreach (IGroup group in grid.Index[other])
+                {
+                    group.Index[value].Remove(other);
+                }
+            }
+
+            // ... and indices
+            foreach (IGroup group in groups)
+            {
+                group.Index[value].RemoveExcept(cell);
+                foreach (char key in group.Index.Keys)
+                {
+                    if (key != value)
+                        group.Index[key].Remove(cell);
+                }
             }
         }
     }
@@ -24,40 +56,55 @@ namespace OpenSudoku
             _grid = grid;
         }
 
-        public void Initialise(char[][] charray)
+        public void Initialise(char[][] initialValues)
         {
-            for (int row = 0; row < charray.Length; row++)
+            Queue<(ICell, char)> queuedUpdates = new Queue<(ICell, char)>();
+            for (int row = 0; row < initialValues.Length; row++)
             {
-                for (int col = 0; col < charray[row].Length; col++)
+                for (int col = 0; col < initialValues[row].Length; col++)
                 {
-                    char value = charray[row][col];
-                    ICell cell = _grid.Cells.ElementAt(row).ElementAt(col);
-
-                    // set cell value
+                    char value = initialValues[row][col];
                     if (value != ' ')
-                        cell.Values.RemoveExcept(value);
-
-                    // update grouped cells
-                    IReadOnlyCollection<IGroup> groups = _grid.Index[cell];
-                    ICell[] others = groups
-                        .Aggregate(new List<ICell>(), (l, g) => l.Concat(g.Cells).ToList())
-                        .Distinct()
-                        .Where(c=>c!=cell)
-                        .ToArray();
-                    foreach (ICell other in others)
                     {
-                        other.Values.Remove(value);
+                        ICell cell = _grid.Cells.ElementAt(row).ElementAt(col);
+                        queuedUpdates.Enqueue((cell, value));
+
                     }
+                }
+            }
 
-                    // check for loners
-                    foreach (IGroup g in groups)
+            while (queuedUpdates.Count > 0)
+            {
+                (ICell cell, char value) = queuedUpdates.Dequeue();
+                IGroup[] cellGroups = _grid.Index[cell].ToArray();
+
+                // Remove other values, remove value from other cells in groups, and update group indices to reflect
+                _grid.UpdateCell(cell, value);
+
+                // check for single-indexed values that haven't yet been updated
+                foreach (IGroup group in cellGroups)
+                {
+                    foreach (char key in group.Index.Keys)
                     {
-                        foreach (char key in g.Index.Keys)
+                        if (group.Index[key].Count == 1)
                         {
-                            if (g.Index[key].Count == 1)
-                                g.Index[key].ElementAt(0).Values.RemoveExcept(key);
+                            ICell groupCell = group.Index[key].ElementAt(0);
+                            if (groupCell.Values.Count > 1) // hasn't been updated
+                                queuedUpdates.Enqueue((groupCell, key));
                         }
                     }
+                }
+
+                // check for single-valued cells that haven't yet been indexed
+                IEnumerable<ICell> singleCells = cellGroups
+                    .Aggregate((IEnumerable<ICell>)new List<ICell>(), (acc, next) => acc.Concat(next.Cells))
+                    .Where(singleCell => singleCell.Values.Count == 1);
+                foreach (ICell singleCell in singleCells)
+                {
+                    char singleValue = singleCell.Values.Single();
+                    bool isIndexed = !_grid.Index[singleCell].Any(group => group.Index[singleValue].Count > 1);
+                    if (!isIndexed)
+                        queuedUpdates.Enqueue((singleCell, singleValue));
                 }
             }
         }
