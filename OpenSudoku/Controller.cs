@@ -5,7 +5,7 @@ namespace OpenSudoku
 {
     internal static class Extensions
     {
-        public static void RemoveExcept(this IList<char> list, char value)
+        public static void RemoveExcept(this ICollection<char> list, char value)
         {
             List<char> remove = list.Where(v => v != value).ToList();
             foreach (char c in remove)
@@ -26,19 +26,19 @@ namespace OpenSudoku
 
         public void Initialise(char[][] charray)
         {
-            for (int i = 0; i < charray.Length; i++)
+            for (int row = 0; row < charray.Length; row++)
             {
-                for (int j = 0; j < charray[i].Length; j++)
+                for (int col = 0; col < charray[row].Length; col++)
                 {
-                    char value = charray[i][j];
-                    ICell cell = _grid.Cells[i][j];
+                    char value = charray[row][col];
+                    ICell cell = _grid.Cells.ElementAt(row).ElementAt(col);
 
                     // set cell value
                     if (value != ' ')
                         cell.Values.RemoveExcept(value);
 
                     // update grouped cells
-                    IList<IGroup> groups = _grid.Index[cell];
+                    IReadOnlyCollection<IGroup> groups = _grid.Index[cell];
                     ICell[] others = groups
                         .Aggregate(new List<ICell>(), (l, g) => l.Concat(g.Cells).ToList())
                         .Distinct()
@@ -55,7 +55,7 @@ namespace OpenSudoku
                         foreach (char key in g.Index.Keys)
                         {
                             if (g.Index[key].Count == 1)
-                                g.Index[key][0].Values.RemoveExcept(key);
+                                g.Index[key].ElementAt(0).Values.RemoveExcept(key);
                         }
                     }
                 }
